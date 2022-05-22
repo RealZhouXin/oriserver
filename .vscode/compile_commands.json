@@ -1,0 +1,11 @@
+[
+{
+  "directory": "/home/xin/cnet/httpserver",
+  "arguments": ["/usr/bin/ccache", "/usr/bin/gcc", "-c", "-m64", "-std=c++20", "-o", "build/.objs/main/linux/x86_64/release/src/connhttp.cpp.o", "src/connhttp.cpp"],
+  "file": "src/connhttp.cpp"
+},
+{
+  "directory": "/home/xin/cnet/httpserver",
+  "arguments": ["/usr/bin/ccache", "/usr/bin/gcc", "-c", "-m64", "-std=c++20", "-o", "build/.objs/main/linux/x86_64/release/src/main.cpp.o", "src/main.cpp"],
+  "file": "src/main.cpp"
+}]
