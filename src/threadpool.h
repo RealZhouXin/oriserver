@@ -5,6 +5,7 @@
 #include <list>
 #include "locker.h"
 #include <cstdio>
+#include <fmtlog/fmtlog.h>
 template<typename T>
 class threadpool {
 public:
@@ -43,8 +44,10 @@ threadpool<T>::threadpool(int t_num, int max_req) : m_thread_number(t_num), m_ma
     }
     //创建thread_num个线程并设置线程分离
     for(int i = 0; i < m_thread_number; i++) {
-        printf("create %d routine\n", i);
-        if(pthread_create(m_threads + i, NULL, worker, this) < 0) {
+        logi("create the {} routine\n", i);
+        fmtlog::poll();
+        if(int err = pthread_create(m_threads + i, NULL, worker, this); err < 0) {
+            loge("pthread_create: {}", err);
             delete [] m_threads;
             throw std::exception();
         }
@@ -78,6 +81,7 @@ bool threadpool<T>::append(T *request) {
 
 template<typename T>
 void* threadpool<T>::worker(void* arg) {
+    logi("thread created\n");
     threadpool *pool = (threadpool *)arg;
     pool->run();
     return pool;

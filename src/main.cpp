@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sys/epoll.h>
 #include "connhttp.h"
+#include "fmtlog/fmtlog.h"
 #include "locker.h"
 #include "threadpool.h"
 #include <libgen.h>
@@ -77,13 +78,14 @@ int main(int argc, char* argv[]) {
     epoll_event events[MAX_EVENT_NUM];
 
     // 将监听的文件描述符到epoll对象中
-    addfd(epollfd, lsnSock, false);
+    addfd(epollfd, lsnSock, false);//FIXME 监听的socket不能用边沿触发
     ConnHTTP::m_epollfd = epollfd;
+    logi("开始监听");
 
     while (true) {
         int num = epoll_wait(epollfd, events, MAX_EVENT_NUM, -1);
         if((num < 0) && (errno != EINTR)) {
-            printf("epoll failue\n");
+            logi("epoll failure\n");
             break;
         }
         //循环遍历

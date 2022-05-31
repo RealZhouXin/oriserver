@@ -1,3 +1,22 @@
 {
-    "todo-tree.tree.showBadges": true
+    "todo-tree.tree.showBadges": true,
+    "cSpell.words": [
+        "addfd",
+        "addsig",
+        "cnet",
+        "connfd",
+        "connhttp",
+        "EPOLLHUP",
+        "HTTPCONNECTION",
+        "httpserver",
+        "modfd",
+        "queuelocker",
+        "queuestat",
+        "REQUESTLINE",
+        "rmfd",
+        "threadpool"
+    ],
+    "cSpell.enableFiletypes": [
+        "!json"
+    ]
 }
