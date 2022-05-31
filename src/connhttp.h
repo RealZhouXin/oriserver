@@ -95,6 +95,17 @@ private:
 	}
 	LINE_STATUS split_line(int &, int size);
 
+	//HTTP 响应
+	void unmap();
+	bool add_response(const char* format, ...);
+	bool add_content(const char* content);
+	bool add_content_type();
+    bool add_status_line( int status, const char* title );
+    bool add_headers( int content_length );
+    bool add_content_length( int content_length );
+    bool add_linger();
+    bool add_blank_line();
+
 private:
 	int m_sockfd; //该连接的socket
 	sockaddr_in m_address;
