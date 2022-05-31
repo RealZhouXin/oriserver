@@ -1,14 +1,16 @@
 add_rules("mode.debug", "mode.release")
 set_languages("c++20")
-add_requires("pthread")
+add_requires("pthread", "fmt", "fmtlog")
 -- target("httpserver")
 --     set_kind("static")
 --     add_files("connhttp.cpp")
 
+set_toolset("clang")
 
 target("main")
     set_kind("binary")
-    add_packages("pthread")
+    add_packages("pthread", "fmt", "fmtlog")
+    add_headerfiles("src/*.h")
     add_files("src/*.cpp")
 
 --

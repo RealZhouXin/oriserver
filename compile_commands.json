@@ -1,0 +1,11 @@
+[
+{
+  "directory": "/home/xin/cnet/httpserver",
+  "arguments": ["/usr/bin/clang",  "-c", "-Qunused-arguments", "-m64", "-std=c++20", "-I", "/home/xin/.xmake/packages/f/fmtlog/v2.1.2/247ebc0c487f4a679714ddeadb1214db/include", "-I", "/home/xin/.xmake/packages/f/fmt/8.1.1/b96a672fc4c74aabb6619561a7a601a9/include", "-o", "build/.objs/main/linux/x86_64/debug/src/connhttp.cpp.o", "src/connhttp.cpp"],
+  "file": "src/connhttp.cpp"
+},
+{
+  "directory": "/home/xin/cnet/httpserver",
+  "arguments": ["/usr/bin/clang", "-c", "-Qunused-arguments", "-m64", "-std=c++20", "-I", "/home/xin/.xmake/packages/f/fmtlog/v2.1.2/247ebc0c487f4a679714ddeadb1214db/include", "-I", "/home/xin/.xmake/packages/f/fmt/8.1.1/b96a672fc4c74aabb6619561a7a601a9/include", "-o", "build/.objs/main/linux/x86_64/debug/src/main.cpp.o", "src/main.cpp"],
+  "file": "src/main.cpp"
+}]
