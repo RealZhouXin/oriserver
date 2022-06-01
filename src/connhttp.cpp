@@ -4,9 +4,12 @@
 #include <asm-generic/errno.h>
 #include <cerrno>
 #include <cstdio>
+#include <cstring>
 #include <fcntl.h>
 #include <sstream>
+#include <strings.h>
 #include <sys/epoll.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <fmtlog/fmtlog.h>
 
@@ -14,6 +17,20 @@ using fmt::print;
 
 int ConnHTTP::m_epollfd = -1;
 int ConnHTTP::m_user_count = 0;
+
+// 定义HTTP响应的一些状态信息
+const char* ok_200_title = "OK";
+const char* error_400_title = "Bad Request";
+const char* error_400_form = "Your request has bad syntax or is inherently impossible to satisfy.\n";
+const char* error_403_title = "Forbidden";
+const char* error_403_form = "You do not have permission to get file from this server.\n";
+const char* error_404_title = "Not Found";
+const char* error_404_form = "The requested file was not found on this server.\n";
+const char* error_500_title = "Internal Error";
+const char* error_500_form = "There was an unusual problem serving the requested file.\n";
+
+//网站的根目录
+const char* doc_root = "/home/xin/cnet/httpserver/data";
 
 void setnonblock(int sock) {
 	int opts;
@@ -69,12 +86,26 @@ void ConnHTTP::Init(int sockfd, const sockaddr_in &addr) {
 	init();
 }
 void ConnHTTP::init() {
+
+	bytes_to_send = 0;
+	bytes_have_send = 0;
+	m_check_state = STATUS::CHECK_STATE_REQUESTLINE;
+
 	mesInfo.method = STATUS::GET;
 	mesInfo.url = 0;
 	mesInfo.version = 0;
 	mesInfo.host = 0;
-	mesInfo.hold = false;
+	mesInfo.hold = false;//默认不连接
 	mesInfo.content_length = 0;
+
+	m_start_line = 0;
+	read_idx = 0;
+	m_write_idx = 0;
+
+	bzero(m_read_buf, READ_BUFFER_SIZE);
+	bzero(m_write_buf, WRITE_BUFFER_SIZE);
+	bzero(m_real_file, FILENAME_LEN);
+	
 }
 void ConnHTTP::Close() {
 	if (m_sockfd != -1) {
@@ -98,7 +129,7 @@ bool ConnHTTP::Read() {
 		}
 		read_idx += bytes_read;
 	}
-	print("读取到了数据：\n{}\n", m_read_buf);
+	logi("读取到了数据：\n{}\n", m_read_buf);
 	return true;
 }
 
@@ -133,12 +164,12 @@ ERR_CODE ConnHTTP::parseReq() {
 	ERR_CODE err = STATUS::NO_REQUEST;
 	char *text = 0;
 	int split_start = 0;
-	print("in parse request\n");
+	logi("in parse request\n");
 	while ((m_check_state == CHECK_STATE::CONTENT && lnSt == LINE_STATUS::LINE_OK)
 	       || (lnSt = split_line(split_start, read_idx)) == LINE_STATUS::LINE_OK) {
 		text = get_line();
 		m_start_line = split_start;
-		print("Get a request line: {}", text);
+		logi("Get a request line: {}", text);
 		switch (m_check_state) {
 		case STATUS::CHECK_STATE_REQUESTLINE: {
 			;
@@ -237,7 +268,31 @@ ERR_CODE ConnHTTP::parse_content(char *text) {
 }
 
 ERR_CODE ConnHTTP::do_request() {
-	
+	strcpy(m_real_file, doc_root);
+	int len = strlen(doc_root);
+	strncpy(m_real_file + len, mesInfo.url, FILENAME_LEN - len - 1);
+
+	//获取m_realfile 文件的相关信息， -1 失败，0 成功
+	if(int err = stat(m_real_file, &m_file_stat); err < 0) {
+		loge("m_real_file state: {}", err);
+		return STATUS::NO_RESOURCE;
+	}
+	//判断访问权限
+	if(!(m_file_stat.st_mode & S_IROTH)) {
+		loge("无访问权限");
+		return STATUS::FORBIDDEN_REQUEST;
+	}
+	//判断是否是目录
+	if(S_ISDIR(m_file_stat.st_mode)) {
+		return STATUS::BAD_REQUEST;
+	}
+
+	//以只读方式打开文件
+	int fd = open(m_real_file, O_RDONLY);
+	//创建内存映射
+	m_file_address = (char *) mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	close(fd);
+
 
 	return STATUS::FILE_REQUEST;
 }
@@ -253,6 +308,7 @@ void ConnHTTP::Process() {
 	//解析请求
 	fmt::print("hello pro\n");
 	parseReq();
+	fmtlog::poll();
 
 	//生成响应
 }

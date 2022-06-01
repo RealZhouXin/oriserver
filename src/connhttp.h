@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <errno.h>
 #include "fmt/core.h"
 #include "locker.h"
@@ -64,6 +65,7 @@ public:
 	static int m_user_count;                   //统计用户数量
 	static const int READ_BUFFER_SIZE = 2048;  //读缓冲区大小
 	static const int WRITE_BUFFER_SIZE = 2048; //写缓冲区大小
+	static const int FILENAME_LEN = 200;       //文件名的最大长度
 
 public:
 	ConnHTTP() {
@@ -95,16 +97,16 @@ private:
 	}
 	LINE_STATUS split_line(int &, int size);
 
-	//HTTP 响应
+	// HTTP 响应
 	void unmap();
-	bool add_response(const char* format, ...);
-	bool add_content(const char* content);
+	bool add_response(const char *format, ...);
+	bool add_content(const char *content);
 	bool add_content_type();
-    bool add_status_line( int status, const char* title );
-    bool add_headers( int content_length );
-    bool add_content_length( int content_length );
-    bool add_linger();
-    bool add_blank_line();
+	bool add_status_line(int status, const char *title);
+	bool add_headers(int content_length);
+	bool add_content_length(int content_length);
+	bool add_linger();
+	bool add_blank_line();
 
 private:
 	int m_sockfd; //该连接的socket
@@ -114,8 +116,18 @@ private:
 	int m_checked_idx; // 当前正在分析的字符在读缓冲区中的位置
 	int m_start_line;  // 当前正在解析的行的起始位置
 
-	CHECK_STATE m_check_state; // 主状态机当前所处的状态
-	MesInfo mesInfo;
+	CHECK_STATE m_check_state;           // 主状态机当前所处的状态
+	MesInfo mesInfo;                     //请求信息
+	char m_real_file[FILENAME_LEN];     //客户请求文件的完整路径
+	char m_write_buf[WRITE_BUFFER_SIZE]; //写缓冲区
+	int m_write_idx;                     //写缓冲区中待发送的字节数
+	char *m_file_address;                //客户请求的目标文件被mmap到内存中的起始位置
+	struct stat m_file_stat;             // 目标文件的状态。通过它我们可以判断文件是否存在、是否为目录、是否可读，并获取文件大小等信息
+	struct iovec m_iv[2];                // 我们将采用writev来执行写操作，所以定义下面两个成员，其中m_iv_count表示被写内存块的数量。
+	int m_iv_count;
+
+	int bytes_to_send;   // 将要发送的数据的字节数
+	int bytes_have_send; // 已经发送的字节数
 };
 
 #endif
