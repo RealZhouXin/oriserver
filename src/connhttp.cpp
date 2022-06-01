@@ -3,6 +3,7 @@
 #include <asm-generic/errno-base.h>
 #include <asm-generic/errno.h>
 #include <cerrno>
+#include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
@@ -297,18 +298,139 @@ ERR_CODE ConnHTTP::do_request() {
 	return STATUS::FILE_REQUEST;
 }
 
-// TODO Write
+//对内存映射区执行munmap操作
+void ConnHTTP::unmap() {
+	if(m_file_address) {
+		munmap(m_file_address, m_file_stat.st_size);
+		m_file_address = 0;
+	}
+}
+
+// TODO Write 写http响应
 bool ConnHTTP::Write() {
 	printf("writing\n");
 	return true;
 }
 
+// 往缓冲中写入待发送的数据
+bool ConnHTTP::add_response(const char* format, ...) {
+	if(m_write_idx >= WRITE_BUFFER_SIZE) {
+		return false;
+	}
+	va_list arg_list;
+	va_start(arg_list, format);
+	int len = vsnprintf(m_write_buf + m_write_idx, WRITE_BUFFER_SIZE - 1 - m_write_idx, format, arg_list);
+	if (len >= (WRITE_BUFFER_SIZE - 1 - m_write_idx)) {
+		return false;
+	}
+	m_write_idx += len;
+	va_end(arg_list);
+	return true;
+
+}
+
+bool ConnHTTP::add_status_line(int status, const char* title) {
+	return add_response("%s%d%s\r\n", "HTTP/1.1", status, title);
+}
+void ConnHTTP::add_headers(int content_len) {
+    add_content_length(content_len);
+    add_content_type();
+    add_linger();
+    add_blank_line();
+}
+bool ConnHTTP::add_content_length(int content_len) {
+    return add_response( "Content-Length: %d\r\n", content_len );
+}
+
+bool ConnHTTP::add_linger()
+{
+    return add_response( "Connection: %s\r\n", ( mesInfo.hold == true ) ? "keep-alive" : "close" );
+}
+
+bool ConnHTTP::add_blank_line()
+{
+    return add_response( "%s", "\r\n" );
+}
+
+bool ConnHTTP::add_content( const char* content )
+{
+    return add_response( "%s", content );
+}
+
+bool ConnHTTP::add_content_type() {
+    return add_response("Content-Type:%s\r\n", "text/html");
+}
+
+// 根据服务器处理HTTP请求的结果，决定返回给客户端的内容
+bool ConnHTTP::process_write(ERR_CODE ret) {
+    switch (ret)
+    {
+        case STATUS::INTERNAL_ERROR:
+            add_status_line( 500, error_500_title );
+            add_headers( strlen( error_500_form ) );
+            if ( ! add_content( error_500_form ) ) {
+                return false;
+            }
+            break;
+        case STATUS::BAD_REQUEST:
+            add_status_line( 400, error_400_title );
+            add_headers( strlen( error_400_form ) );
+            if ( ! add_content( error_400_form ) ) {
+                return false;
+            }
+            break;
+        case STATUS::NO_RESOURCE:
+            add_status_line( 404, error_404_title );
+            add_headers( strlen( error_404_form ) );
+            if ( ! add_content( error_404_form ) ) {
+                return false;
+            }
+            break;
+        case STATUS::FORBIDDEN_REQUEST:
+            add_status_line( 403, error_403_title );
+            add_headers(strlen( error_403_form));
+            if ( ! add_content( error_403_form ) ) {
+                return false;
+            }
+            break;
+        case STATUS::FILE_REQUEST:
+            add_status_line(200, ok_200_title );
+            add_headers(m_file_stat.st_size);
+            m_iv[ 0 ].iov_base = m_write_buf;
+            m_iv[ 0 ].iov_len = m_write_idx;
+            m_iv[ 1 ].iov_base = m_file_address;
+            m_iv[ 1 ].iov_len = m_file_stat.st_size;
+            m_iv_count = 2;
+
+            bytes_to_send = m_write_idx + m_file_stat.st_size;
+
+            return true;
+        default:
+            return false;
+    }
+
+    m_iv[ 0 ].iov_base = m_write_buf;
+    m_iv[ 0 ].iov_len = m_write_idx;
+    m_iv_count = 1;
+    bytes_to_send = m_write_idx;
+    return true;
+}
+
+
+
 // TODO http请求入口函数
 void ConnHTTP::Process() {
 	//解析请求
-	fmt::print("hello pro\n");
-	parseReq();
-	fmtlog::poll();
+	ERR_CODE read_ret = parseReq();
+	if(read_ret == STATUS::NO_REQUEST) {
+		modfd(m_epollfd, m_sockfd, EPOLLIN);
+		return;
+	}
 
 	//生成响应
+	bool write_ret = process_write(read_ret);
+	if(!write_ret) {
+		Close();
+	}
+	modfd(m_epollfd, m_sockfd, EPOLLOUT);
 }
